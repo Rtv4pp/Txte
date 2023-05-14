@@ -3,79 +3,390 @@ import cv2
 import numpy as np
 from bs4 import BeautifulSoup
 import json
+import re
 
 # Defina a URL base da busca
-url_base = "https://www.google.com/search?q={termo}&tbm=isch&tbo=u&source=univ&sa=X&ved=0ahUKEwi1v6CtjJLxAhVEyDgGHQaKDRoQsAQI4gE&biw=1366&bih=657"
-
+url_base_google = "https://www.google.com/search?q={termo}&tbm=isch&tbo=u&source=univ&sa=X&ved=0ahUKEwi1v6CtjJLxAhVEyDgGHQaKDRoQsAQI4gE&biw=1366&bih=657"
+url_base_facebook = "https://www.facebook.com/search/people/?q={termo}"
+url_base_instagram = "https://www.instagram.com/web/search/topsearch/?query={termo}"
+url_base_google_compl = "https://suggestqueries.google.com/complete/search?q={termo}&client=firefox&ds=yt"
 # Solicite que o usuário digite o termo de busca
-termo = input("Digite o termo de busca: ")
+
+print("""
+================BY RDEV================
+Utilize como busca CPF, NOME etc...
+=======================================
+    """)
+termo = input("Digite o termo de busca:")
 
 # Substitua os espaços por sinal de mais (+)
 termo_formatado = termo.replace(" ", "+")
 
-# Substitua o termo na URL base
-url_busca = url_base.format(termo=termo_formatado)
+# Solicite que o usuário escolha a plataforma
+print("Escolha a plataforma para pesquisar:")
+print("[1] Imagens")
+print("[2] Facebook")
+print("[3] Instagram")
+print("[4] Buscar por termos")
+print("[5] Buscar por CPF, TELEFONE e EMAIL")
+print("[6] Todos")
+plataforma = input("Digite o número da plataforma: ")
+print("""
 
-# Faça a requisição HTTP para a página de busca
-resposta = requests.get(url_busca)
+    """)
+if plataforma == "1":
+    # Substitua o termo na URL base do Google
+    url_busca = url_base_google.format(termo=termo_formatado)
 
-# Verifique se a busca foi bem-sucedida
-if resposta.status_code == 200:
+    # Faça a requisição HTTP para a página de busca
+    resposta = requests.get(url_busca)
 
-    # Parseie o HTML da página de busca
-    soup = BeautifulSoup(resposta.text, "html.parser")
+    # Verifique se a busca foi bem-sucedida
+    if resposta.status_code == 200:
+        # Parseie o HTML da página de busca
+        soup = BeautifulSoup(resposta.text, "html.parser")
 
-    # Encontre todas as imagens na página de busca
-    imagens = soup.select('img[src^="http"]')
+        # Encontre todas as imagens na página de busca
+        imagens = soup.select('img[src^="http"]')
 
-    # Para cada imagem, verifique se ela contém um rosto de pessoa
-    for imagem in imagens:
+        # Para cada imagem, verifique se ela contém um rosto de pessoa
+        for imagem in imagens:
 
-        # Faça a requisição HTTP para a imagem
-        imagem_url = imagem["src"]
-        resposta_imagem = requests.get(imagem_url, stream=True)
+            # Faça a requisição HTTP para a imagem
+            imagem_url = imagem["src"]
+            resposta_imagem = requests.get(imagem_url, stream=True)
 
-        # Converta a imagem para um array NumPy
-        imagem_array = np.asarray(bytearray(resposta_imagem.content), dtype=np.uint8)
-        imagem_opencv = cv2.imdecode(imagem_array, -1)
+            # Converta a imagem para um array NumPy
+            imagem_array = np.asarray(bytearray(resposta_imagem.content), dtype=np.uint8)
+            imagem_opencv = cv2.imdecode(imagem_array, -1)
 
-        # Detecte faces na imagem usando o classificador Haar Cascade
-        classificador = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-        faces = classificador.detectMultiScale(imagem_opencv, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+            # Detecte faces na imagem usando o classificador Haar Cascade
+            classificador = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+            faces = classificador.detectMultiScale(imagem_opencv, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
-        # Se a imagem contém pelo menos uma face, imprima o link da imagem
-        if len(faces) > 0:
-            print("Imagem relacionadas: " + imagem_url)
+            # Se a imagem contém pelo menos uma face, imprima o link da imagem
+            if len(faces) > 0:
+                print("Imagem relacionadas: " + imagem_url)
+    else:
+        print("A busca não foi bem-sucedida. Status code:", resposta.status_code)
 
-    def coletar_info_facebook(termo):
-        url = f"https://www.facebook.com/search/people/?q={termo}"
-        resposta = requests.get(url)
-        if resposta.status_code == 200:
-            soup = BeautifulSoup(resposta.text, "html.parser")
-            resultados = soup.select('div[data-testid="browse-result-content"]')
-            for resultado in resultados:
-                nome_resultado = resultado.select_one('div[data-testid="browse-result-name"]').text
-                perfil_url = resultado.select_one('a[data-testid="browse-result-link"]')['href']
-                print(f"Nome: {nome_resultado} | Perfil: {perfil_url}")
-        else:
-            print("Não foi possível conectar ao Facebook.")
+elif plataforma == "2":
+    url_busca = url_base_facebook.format(termo=termo_formatado)
+    resposta = requests.get(url_busca)
+    if resposta.status_code == 200:
+        soup = BeautifulSoup(resposta.text, "html.parser")
+        resultados = soup.select('div[data-testid="browse-result-content"]')
+        for resultado in resultados:
+            nome_resultado = resultado.select_one('div[data-testid="browse-result-name"]').text
+            perfil_url = resultado.select_one('a[data-testid="browse-result-link"]')['href']
+            print(f"Nome: {nome_resultado} | Perfil: {perfil_url}")
+    else:
+        print("Não foi possível conectar ao Facebook.")
+
+elif plataforma == "3":
+    # Substitua o termo na URL base do Instagram
+    url_busca = url_base_instagram.format(termo=termo_formatado)
+
+    # Faça a requisição HTTP para a página de busca
+    resposta = requests.get(url_busca)
+    if resposta.status_code == 200:
+        resultados = json.loads(resposta.text)['users']
+        for resultado in resultados:
+            nome_resultado = resultado['user']['full_name']
+            perfil_url = f"https://www.instagram.com/{resultado['user']['username']}"
+            print(f"Nome: {nome_resultado} | Perfil: {perfil_url}")
+    else:
+        print("Não foi possível conectar ao Instagram.")
+
+elif plataforma == "4":
+    url_base_google_compl = "https://www.google.com/search?q={termo}&start={start}&num=10"
+    start = 0
+    max_resultados = 100
+
+    resultados = []
+    while len(resultados) < max_resultados:
+        url_busca = url_base_google_compl.format(termo=termo_formatado, start=start)
+        resposta = requests.get(url_busca)
+        soup = BeautifulSoup(resposta.text, "html.parser")
+        sugestoes = soup.find_all("div", class_="BNeawe s3v9rd AP7Wnd")
+        for sugestao in sugestoes:
+            nome = sugestao.text.strip()
+            if nome not in resultados:
+                resultados.append(nome)
+        if len(sugestoes) == 0:
+            break
+        start += 10
+
+    cpfs = []
+    nomes = []
+    telefones = []
+    emails = []
+
+    for resultado in resultados:
+        # Busca CPF
+        cpf_match = re.search(r"\d{3}\.\d{3}\.\d{3}-\d{2}", resultado)
+        if cpf_match:
+            cpf = cpf_match.group(0)
+            if cpf not in cpfs:
+                cpfs.append(cpf)
+                print(f"CPF encontrado: {cpf} - {resultado}")
+        
+        # Busca nome completo
+        nome_match = re.search(r"\b([A-Z][a-z]*\s)+[A-Z][a-z]*\b", resultado)
+        if nome_match:
+            nome = nome_match.group(0)
+            if nome not in nomes:
+                nomes.append(nome)
+                print(f"Nome encontrado: {nome} - {resultado}")
+        
+        # Busca telefone
+        telefone_match = re.search(r"\(\d{2}\)\s\d{4,5}-\d{4}", resultado)
+        if telefone_match:
+            telefone = telefone_match.group(0)
+            if telefone not in telefones:
+                telefones.append(telefone)
+                print(f"Telefone encontrado: {telefone} - {resultado}")
+        
+        # Busca email
+        email_match = re.search(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", resultado)
+        if email_match:
+            email = email_match.group(0)
+            if email not in emails:
+                emails.append(email)
+                print(f"E-mail encontrado: {email} - {resultado}")
 
 
-    def coletar_info_instagram(termo):
-        url = f"https://www.instagram.com/web/search/topsearch/?query={termo}"
-        resposta = requests.get(url)
-        if resposta.status_code == 200:
-            resultados = json.loads(resposta.text)['users']
-            for resultado in resultados:
-                nome_resultado = resultado['user']['full_name']
-                perfil_url = f"https://www.instagram.com/{resultado['user']['username']}"
-                print(f"Nome: {nome_resultado} | Perfil: {perfil_url}")
-        else:
-            print("Não foi possível conectar ao Instagram.")
+elif plataforma == "5":
+    url_base_google_compl = "https://www.google.com/search?q={termo}&start={start}&num=10"
+    start = 0
+    max_resultados = 100
 
+    resultados = []
+    while len(resultados) < max_resultados:
+        url_busca = url_base_google_compl.format(termo=termo_formatado, start=start)
+        resposta = requests.get(url_busca)
+        soup = BeautifulSoup(resposta.text, "html.parser")
+        sugestoes = soup.find_all("div", class_="BNeawe s3v9rd AP7Wnd")
+        for sugestao in sugestoes:
+            nome = sugestao.text.strip()
+            if nome not in resultados:
+                resultados.append(nome)
+        if len(sugestoes) == 0:
+            break
+        start += 10
 
-    termo_formatado = termo.replace(" ", "+")
-    coletar_info_instagram(termo_formatado)
-    coletar_info_facebook(termo_formatado)
+    cpfs = []
+    telefones = []
+    emails = []
+
+    for resultado in resultados:
+        # Busca CPF
+        cpf_match = re.search(r"\d{3}\.\d{3}\.\d{3}-\d{2}", resultado)
+        if cpf_match:
+            cpf = cpf_match.group(0)
+            if cpf not in cpfs:
+                cpfs.append(cpf)
+        
+        # Busca telefone
+        telefone_match = re.search(r"\(\d{2}\)\s\d{4,5}-\d{4}", resultado)
+        if telefone_match:
+            telefone = telefone_match.group(0)
+            if telefone not in telefones:
+                telefones.append(telefone)
+        
+        # Busca email
+        email_match = re.search(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", resultado)
+        if email_match:
+            email = email_match.group(0)
+            if email not in emails:
+                emails.append(email)
+
+    print("CPFs encontrados:")
+    for cpf in cpfs:
+        print("- " + cpf)
+
+    print("Telefones encontrados:")
+    for telefone in telefones:
+        print("- " + telefone)
+
+    print("Emails encontrados:")
+    for email in emails:
+        print("- " + email)
+
+elif plataforma == "6":
+    # busca em todas as plataformas
+
+    # Google Imagens
+    url_busca = url_base_google.format(termo=termo_formatado)
+    resposta = requests.get(url_busca)
+    if resposta.status_code == 200:
+        soup = BeautifulSoup(resposta.text, "html.parser")
+        imagens = soup.select('img[src^="http"]')
+        for imagem in imagens:
+            imagem_url = imagem["src"]
+            resposta_imagem = requests.get(imagem_url, stream=True)
+            imagem_array = np.asarray(bytearray(resposta_imagem.content), dtype=np.uint8)
+            imagem_opencv = cv2.imdecode(imagem_array, -1)
+            classificador = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+            faces = classificador.detectMultiScale(imagem_opencv, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+            if len(faces) > 0:
+                print("Imagem relacionadas: " + imagem_url)
+    else:
+        print("A busca no Google Imagens não foi bem-sucedida. Status code:", resposta.status_code)
+
+    print("""
+
+    """)
+
+    # Facebook
+    url_busca = url_base_facebook.format(termo=termo_formatado)
+    resposta = requests.get(url_busca)
+    if resposta.status_code == 200:
+        soup = BeautifulSoup(resposta.text, "html.parser")
+        resultados = soup.select('div[data-testid="browse-result-content"]')
+        for resultado in resultados:
+            nome_resultado = resultado.select_one('div[data-testid="browse-result-name"]').text
+            perfil_url = resultado.select_one('a[data-testid="browse-result-link"]')['href']
+            print(f"Nome: {nome_resultado} | Perfil: {perfil_url}")
+    else:
+        print("Não foi possível conectar ao Facebook.")
+
+    print("""
+
+        """)
+
+    # Instagram
+    url_busca = url_base_instagram.format(termo=termo_formatado)
+    resposta = requests.get(url_busca)
+    if resposta.status_code == 200:
+        resultados = json.loads(resposta.text)['users']
+        for resultado in resultados:
+            nome_resultado = resultado['user']['full_name']
+            perfil_url = f"https://www.instagram.com/{resultado['user']['username']}"
+            print(f"Nome: {nome_resultado} | Perfil: {perfil_url}")
+    else:
+        print("Não foi possível conectar ao Instagram.")
+
+    print("""
+
+        """)
+
+    #Busca por EMAIL, CPF, EMAIL
+    url_base_google_compl = "https://www.google.com/search?q={termo}&start={start}&num=10"
+    start = 0
+    max_resultados = 100
+
+    resultados = []
+    while len(resultados) < max_resultados:
+        url_busca = url_base_google_compl.format(termo=termo_formatado, start=start)
+        resposta = requests.get(url_busca)
+        soup = BeautifulSoup(resposta.text, "html.parser")
+        sugestoes = soup.find_all("div", class_="BNeawe s3v9rd AP7Wnd")
+        for sugestao in sugestoes:
+            nome = sugestao.text.strip()
+            if nome not in resultados:
+                resultados.append(nome)
+        if len(sugestoes) == 0:
+            break
+        start += 10
+
+    cpfs = []
+    telefones = []
+    emails = []
+
+    for resultado in resultados:
+        # Busca CPF
+        cpf_match = re.search(r"\d{3}\.\d{3}\.\d{3}-\d{2}", resultado)
+        if cpf_match:
+            cpf = cpf_match.group(0)
+            if cpf not in cpfs:
+                cpfs.append(cpf)
+        
+        # Busca telefone
+        telefone_match = re.search(r"\(\d{2}\)\s\d{4,5}-\d{4}", resultado)
+        if telefone_match:
+            telefone = telefone_match.group(0)
+            if telefone not in telefones:
+                telefones.append(telefone)
+        
+        # Busca email
+        email_match = re.search(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", resultado)
+        if email_match:
+            email = email_match.group(0)
+            if email not in emails:
+                emails.append(email)
+
+    print("CPFs encontrados:")
+    for cpf in cpfs:
+        print("- " + cpf)
+
+    print("Telefones encontrados:")
+    for telefone in telefones:
+        print("- " + telefone)
+
+    print("Emails encontrados:")
+    for email in emails:
+        print("- " + email)
+
+    print("""
+
+        """)
+    #Busca por Termo
+    url_base_google_compl = "https://www.google.com/search?q={termo}&start={start}&num=10"
+    start = 0
+    max_resultados = 100
+
+    resultados = []
+    while len(resultados) < max_resultados:
+        url_busca = url_base_google_compl.format(termo=termo_formatado, start=start)
+        resposta = requests.get(url_busca)
+        soup = BeautifulSoup(resposta.text, "html.parser")
+        sugestoes = soup.find_all("div", class_="BNeawe s3v9rd AP7Wnd")
+        for sugestao in sugestoes:
+            nome = sugestao.text.strip()
+            if nome not in resultados:
+                resultados.append(nome)
+        if len(sugestoes) == 0:
+            break
+        start += 10
+
+    cpfs = []
+    nomes = []
+    telefones = []
+    emails = []
+
+    for resultado in resultados:
+        # Busca CPF
+        cpf_match = re.search(r"\d{3}\.\d{3}\.\d{3}-\d{2}", resultado)
+        if cpf_match:
+            cpf = cpf_match.group(0)
+            if cpf not in cpfs:
+                cpfs.append(cpf)
+                print(f"CPF encontrado: {cpf} - {resultado}")
+        
+        # Busca nome completo
+        nome_match = re.search(r"\b([A-Z][a-z]*\s)+[A-Z][a-z]*\b", resultado)
+        if nome_match:
+            nome = nome_match.group(0)
+            if nome not in nomes:
+                nomes.append(nome)
+                print(f"Nome encontrado: {nome} - {resultado}")
+        
+        # Busca telefone
+        telefone_match = re.search(r"\(\d{2}\)\s\d{4,5}-\d{4}", resultado)
+        if telefone_match:
+            telefone = telefone_match.group(0)
+            if telefone not in telefones:
+                telefones.append(telefone)
+                print(f"Telefone encontrado: {telefone} - {resultado}")
+        
+        # Busca email
+        email_match = re.search(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", resultado)
+        if email_match:
+            email = email_match.group(0)
+            if email not in emails:
+                emails.append(email)
+                print(f"E-mail encontrado: {email} - {resultado}")
+
 else:
-    print("A busca não foi bem-sucedida. Status code:", resposta.status_code)
+    print("Opção inválida.")
